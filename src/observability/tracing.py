@@ -33,14 +33,15 @@ load_dotenv()
 _client: opik.Opik | None = None
 
 
-def init_tracing(project_name: str = "audio-analysis-agents") -> opik.Opik:
+def init_tracing(project_name: str = None) -> opik.Opik:
     """
     Initialise Opik tracing.
 
     Call this once at application startup.
 
     Args:
-        project_name: Name of the project in Opik dashboard
+        project_name: Name of the project in Opik dashboard.
+                      Defaults to OPIK_PROJECT_NAME env var or "audio-analysis-agents".
 
     Returns:
         Opik client instance
@@ -52,8 +53,9 @@ def init_tracing(project_name: str = "audio-analysis-agents") -> opik.Opik:
         print("Warning: OPIK_API_KEY not set, tracing disabled")
         return None
 
-    _client = opik.Opik(project_name=project_name)
-    print(f"Opik tracing initialised for project: {project_name}")
+    project = project_name or os.getenv("OPIK_PROJECT_NAME", "audio-analysis-agents")
+    _client = opik.Opik(project_name=project)
+    print(f"Opik tracing initialised for project: {project}")
     return _client
 
 
