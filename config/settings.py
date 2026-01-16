@@ -52,7 +52,8 @@ TEMPLATES = [
     },
 ]
 
-# ASGI application
+# WSGI/ASGI application
+WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Database - PostgreSQL in production, SQLite for local dev
