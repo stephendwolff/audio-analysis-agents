@@ -5,6 +5,7 @@ Django settings for audio-analysis-agents project.
 import os
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -49,12 +50,12 @@ TEMPLATES = [
 # ASGI application
 ASGI_APPLICATION = "config.asgi.application"
 
-# Database - using SQLite for simplicity
+# Database - PostgreSQL in production, SQLite for local dev
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 # Channels - in-memory for development
