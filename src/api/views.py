@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 from django.conf import settings
+from django.core.files.storage import default_storage
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -61,29 +62,25 @@ class TrackUploadView(APIView):
         # Generate track ID and save file
         track_id = str(uuid.uuid4())
         filename = f"{track_id}{ext}"
-        filepath = settings.MEDIA_ROOT / filename
 
-        # Ensure upload directory exists
-        settings.MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
-        # Save file
-        with open(filepath, "wb") as f:
-            for chunk in uploaded_file.chunks():
-                f.write(chunk)
+        # Save using Django's storage backend (works with both local and S3)
+        saved_path = default_storage.save(filename, uploaded_file)
+        file_url = default_storage.url(saved_path)
 
         # Store track info
         TRACKS[track_id] = {
             "track_id": track_id,
             "original_filename": uploaded_file.name,
             "filename": filename,
-            "path": str(filepath),
+            "storage_path": saved_path,
+            "url": file_url,
             "size": uploaded_file.size,
         }
 
         return Response({
             "track_id": track_id,
             "filename": uploaded_file.name,
-            "path": f"{settings.MEDIA_URL}{filename}",
+            "path": file_url,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -114,11 +111,11 @@ class TrackDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Delete file
+        # Delete file using storage backend
         track = TRACKS[track_id]
-        filepath = Path(track["path"])
-        if filepath.exists():
-            filepath.unlink()
+        storage_path = track.get("storage_path", track.get("filename"))
+        if default_storage.exists(storage_path):
+            default_storage.delete(storage_path)
 
         # Remove from storage
         del TRACKS[track_id]
@@ -141,7 +138,24 @@ class TrackListView(APIView):
 
 
 def get_track_path(track_id: str) -> str | None:
-    """Get the file path for a track ID. Used by WebSocket consumer."""
-    if track_id in TRACKS:
-        return TRACKS[track_id]["path"]
-    return None
+    """
+    Get the file path for a track ID. Used by WebSocket consumer.
+
+    For local storage, returns the filesystem path.
+    For S3 storage, returns the S3 URL (agent needs to handle this).
+    """
+    if track_id not in TRACKS:
+        return None
+
+    track = TRACKS[track_id]
+    storage_path = track.get("storage_path", track.get("filename"))
+
+    # For local storage, return the actual file path
+    # For S3, return the URL
+    if hasattr(default_storage, "path"):
+        try:
+            return default_storage.path(storage_path)
+        except NotImplementedError:
+            # S3 doesn't support path(), return URL instead
+            return track.get("url")
+    return track.get("url")

@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "storages",
     "channels",
     "src.api",
 ]
@@ -79,8 +80,38 @@ STATICFILES_DIRS = [
 ]
 
 # Media files (uploaded audio)
-MEDIA_URL = "media/"
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "data" / "uploads"))
+# Use S3 in production if AWS_STORAGE_BUCKET_NAME is set
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+
+if AWS_STORAGE_BUCKET_NAME:
+    # S3 Storage Configuration
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "us-east-1")
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    AWS_DEFAULT_ACL = None
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+    AWS_LOCATION = "media"
+
+    # Use S3 for media files
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "location": AWS_LOCATION,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/"
+    # MEDIA_ROOT not used with S3, but set for compatibility
+    MEDIA_ROOT = BASE_DIR / "data" / "uploads"
+else:
+    # Local filesystem storage (development)
+    MEDIA_URL = "media/"
+    MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "data" / "uploads"))
 
 # REST Framework
 REST_FRAMEWORK = {
