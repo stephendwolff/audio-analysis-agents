@@ -75,7 +75,7 @@ STATICFILES_DIRS = [
 
 # Media files (uploaded audio)
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "data" / "uploads"
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "data" / "uploads"))
 
 # REST Framework
 REST_FRAMEWORK = {
