@@ -33,6 +33,15 @@ litellm = [
     "python-dotenv>=1.0.0",
     "opik>=1.0.0",
 ]
+api = [
+    "django>=5.0.0",
+    "djangorestframework>=3.14.0",
+    "channels>=4.0.0",
+    "uvicorn[standard]>=0.30.0",
+    "gunicorn>=22.0.0",
+    "python-dotenv>=1.0.0",
+    "google-genai>=1.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

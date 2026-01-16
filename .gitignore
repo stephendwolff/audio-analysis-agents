@@ -29,6 +29,11 @@ data/samples/*
 !data/samples/.gitkeep
 data/outputs/*
 !data/outputs/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Django
+db.sqlite3
 
 # Eval fixtures (generated)
 evals/fixtures/*
