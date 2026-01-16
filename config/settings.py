@@ -3,6 +3,7 @@ Django settings for audio-analysis-agents project.
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt",
     "channels",
     "src.api",
 ]
@@ -80,10 +82,26 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", BASE_DIR / "data" / "uploads"))
 
 # REST Framework
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "src.api.auth.APIKeyAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [],
     "UNAUTHENTICATED_USER": None,
 }
+
+# JWT Configuration
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+# Demo token lifetime (shorter)
+DEMO_TOKEN_LIFETIME = timedelta(minutes=15)
+DEMO_REQUEST_LIMIT = 5
 
 # CORS - allow all for development (frontend can be on different origin)
 CORS_ALLOW_ALL_ORIGINS = DEBUG
