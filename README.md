@@ -116,6 +116,48 @@ class MyCustomAgent(BaseAgent):
 - `whitenoise` - Static file serving
 - `dj-database-url` - Database URL parsing
 - `psycopg2-binary` - PostgreSQL driver
+- `django-storages` - S3 storage backend
+- `boto3` - AWS SDK
+
+## Authentication
+
+The API supports two authentication methods:
+
+### JWT Authentication (Recommended)
+
+**Demo Mode** - Get a temporary token with limited usage (15 min, 5 requests):
+```bash
+curl -X POST https://your-app.railway.app/api/auth/demo/ \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Login** - Get a token for registered users:
+```bash
+curl -X POST https://your-app.railway.app/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "secret"}'
+```
+
+**Using the token:**
+```bash
+curl https://your-app.railway.app/api/tracks/list/ \
+  -H "Authorization: Bearer <access_token>"
+```
+
+**Refresh token:**
+```bash
+curl -X POST https://your-app.railway.app/api/auth/refresh/ \
+  -H "Content-Type: application/json" \
+  -d '{"refresh": "<refresh_token>"}'
+```
+
+### API Key Authentication (Legacy)
+
+```bash
+curl https://your-app.railway.app/api/tracks/list/ \
+  -H "X-API-Key: your-api-key"
+```
 
 ## Railway Deployment
 
@@ -127,13 +169,23 @@ class MyCustomAgent(BaseAgent):
 | `DJANGO_DEBUG` | Yes | Set to `false` for production |
 | `DJANGO_ALLOWED_HOSTS` | Yes | Set to `.railway.app` (or your custom domain) |
 | `DATABASE_URL` | Auto | Provided automatically by Railway PostgreSQL |
-| `MEDIA_ROOT` | Yes | Set to `/app/data/uploads` (mount volume here) |
-| `API_KEY` | Yes | Your API key for authentication |
+| `API_KEY` | No | API key for legacy authentication |
 | `LLM_MODEL` | No | LLM model to use (default: `gemini/gemini-2.0-flash`) |
 | `GOOGLE_API_KEY` | Conditional | Required if using Gemini models |
 | `ANTHROPIC_API_KEY` | Conditional | Required if using Claude models |
 | `OPIK_API_KEY` | No | Opik API key for tracing (omit to disable) |
 | `OPIK_PROJECT_NAME` | No | Opik project name (default: `audio-analysis-agents`) |
+
+**S3 Storage (recommended for Railway):**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AWS_STORAGE_BUCKET_NAME` | Yes* | S3 bucket name (enables S3 storage) |
+| `AWS_ACCESS_KEY_ID` | Yes* | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | Yes* | AWS secret key |
+| `AWS_S3_REGION_NAME` | No | AWS region (default: `us-east-1`) |
+
+*Required if using S3 storage. If not set, falls back to local filesystem.
 
 ### Setup Steps
 
@@ -151,13 +203,30 @@ class MyCustomAgent(BaseAgent):
 - Click **Add Reference** → select the PostgreSQL service → select `DATABASE_URL`
 - This automatically links the database URL to your app
 
-#### 3. Add Volume for Media Files
+#### 3. Set Up S3 Storage (Recommended)
+
+Use Terraform to create an S3 bucket with the right permissions:
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your bucket name
+
+terraform init
+terraform apply
+
+# Get credentials for Railway
+terraform output -raw aws_secret_access_key
+```
+
+Then add the S3 variables to Railway (see Environment Variables above).
+
+**Alternative: Railway Volume** (simpler but less reliable)
 
 - Click on your app service → **Settings** tab
 - Scroll to **Volumes** section → **+ Add Volume**
 - Set mount path: `/app/data/uploads`
-- Click **Add**
-- Go to **Variables** tab and add: `MEDIA_ROOT` = `/app/data/uploads`
+- Add variable: `MEDIA_ROOT` = `/app/data/uploads`
 
 #### 4. Set Environment Variables
 
@@ -167,9 +236,13 @@ In your app service → **Variables** tab, add:
 DJANGO_SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_urlsafe(50))">
 DJANGO_DEBUG=false
 DJANGO_ALLOWED_HOSTS=.railway.app
-MEDIA_ROOT=/app/data/uploads
-API_KEY=<your-api-key>
 GOOGLE_API_KEY=<your-google-api-key>
+
+# S3 Storage (from terraform output)
+AWS_STORAGE_BUCKET_NAME=<your-bucket-name>
+AWS_ACCESS_KEY_ID=<from-terraform>
+AWS_SECRET_ACCESS_KEY=<from-terraform>
+AWS_S3_REGION_NAME=us-east-1
 ```
 
 ## License
