@@ -6,9 +6,10 @@ This evaluates TOOL SELECTION accuracy, not the actual analysis results.
 
 Run with: python evals/run_evals.py
 Options:
-  --verbose    Show details for each test case
-  --category   Only run tests in a specific category
-  --id         Run a single test by ID
+  --verbose      Show details for each test case
+  --category     Only run tests in a specific category
+  --id           Run a single test by ID
+  --langgraph    Use LangGraph implementation instead of raw SDK
 """
 
 import argparse
@@ -101,7 +102,8 @@ def run_all_evals(
     manifest_path: Path,
     verbose: bool = False,
     category: str | None = None,
-    test_id: str | None = None
+    test_id: str | None = None,
+    use_langgraph: bool = False,
 ) -> list[EvalResult]:
     """Run all eval test cases."""
     manifest = load_manifest(manifest_path)
@@ -122,7 +124,13 @@ def run_all_evals(
         return []
 
     # Create router (disable tracing for evals to reduce noise)
-    router = LLMRouter(enable_tracing=False)
+    if use_langgraph:
+        from src.orchestrator import LLMRouterLangGraph
+        router = LLMRouterLangGraph(enable_tracing=False)
+        print("Using LangGraph implementation")
+    else:
+        router = LLMRouter(enable_tracing=False)
+        print("Using raw SDK implementation")
 
     results = []
     for i, test_case in enumerate(test_cases, 1):
@@ -163,6 +171,7 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true", help="Show details for each test")
     parser.add_argument("--category", "-c", help="Only run tests in this category")
     parser.add_argument("--id", help="Run a single test by ID")
+    parser.add_argument("--langgraph", action="store_true", help="Use LangGraph implementation")
     args = parser.parse_args()
 
     if not os.getenv("GOOGLE_API_KEY"):
@@ -182,7 +191,8 @@ def main():
         manifest_path,
         verbose=args.verbose,
         category=args.category,
-        test_id=args.id
+        test_id=args.id,
+        use_langgraph=args.langgraph,
     )
 
     print_summary(results)
