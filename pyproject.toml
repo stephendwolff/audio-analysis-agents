@@ -28,6 +28,11 @@ langgraph = [
     "python-dotenv>=1.0.0",
     "opik>=1.0.0",
 ]
+litellm = [
+    "litellm>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "opik>=1.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

@@ -9,7 +9,9 @@ Options:
   --verbose      Show details for each test case
   --category     Only run tests in a specific category
   --id           Run a single test by ID
-  --langgraph    Use LangGraph implementation instead of raw SDK
+  --langgraph    Use LangGraph implementation
+  --litellm      Use LiteLLM implementation (provider-agnostic)
+  --model        Model to use with LiteLLM (e.g., claude-sonnet-4-20250514, gemini/gemini-2.0-flash)
 """
 
 import argparse
@@ -104,6 +106,8 @@ def run_all_evals(
     category: str | None = None,
     test_id: str | None = None,
     use_langgraph: bool = False,
+    use_litellm: bool = False,
+    model: str | None = None,
 ) -> list[EvalResult]:
     """Run all eval test cases."""
     manifest = load_manifest(manifest_path)
@@ -124,7 +128,12 @@ def run_all_evals(
         return []
 
     # Create router (disable tracing for evals to reduce noise)
-    if use_langgraph:
+    if use_litellm:
+        from src.orchestrator import LLMRouterLiteLLM
+        model_name = model or "claude-sonnet-4-20250514"
+        router = LLMRouterLiteLLM(model=model_name, enable_tracing=False)
+        print(f"Using LiteLLM implementation with model: {model_name}")
+    elif use_langgraph:
         from src.orchestrator import LLMRouterLangGraph
         router = LLMRouterLangGraph(enable_tracing=False)
         print("Using LangGraph implementation")
@@ -172,11 +181,26 @@ def main():
     parser.add_argument("--category", "-c", help="Only run tests in this category")
     parser.add_argument("--id", help="Run a single test by ID")
     parser.add_argument("--langgraph", action="store_true", help="Use LangGraph implementation")
+    parser.add_argument("--litellm", action="store_true", help="Use LiteLLM implementation")
+    parser.add_argument("--model", "-m", help="Model for LiteLLM (e.g., claude-sonnet-4-20250514)")
     args = parser.parse_args()
 
-    if not os.getenv("GOOGLE_API_KEY"):
-        print("Error: GOOGLE_API_KEY not set")
-        sys.exit(1)
+    # Check for required API keys based on implementation
+    if args.litellm:
+        model = args.model or "claude-sonnet-4-20250514"
+        if "claude" in model and not os.getenv("ANTHROPIC_API_KEY"):
+            print("Error: ANTHROPIC_API_KEY not set (required for Claude models)")
+            sys.exit(1)
+        if "gemini" in model and not os.getenv("GOOGLE_API_KEY"):
+            print("Error: GOOGLE_API_KEY not set (required for Gemini models)")
+            sys.exit(1)
+        if "gpt" in model and not os.getenv("OPENAI_API_KEY"):
+            print("Error: OPENAI_API_KEY not set (required for OpenAI models)")
+            sys.exit(1)
+    else:
+        if not os.getenv("GOOGLE_API_KEY"):
+            print("Error: GOOGLE_API_KEY not set")
+            sys.exit(1)
 
     manifest_path = Path(__file__).parent / "manifest.json"
     if not manifest_path.exists():
@@ -193,6 +217,8 @@ def main():
         category=args.category,
         test_id=args.id,
         use_langgraph=args.langgraph,
+        use_litellm=args.litellm,
+        model=args.model,
     )
 
     print_summary(results)
