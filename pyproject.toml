@@ -41,6 +41,9 @@ api = [
     "gunicorn>=22.0.0",
     "python-dotenv>=1.0.0",
     "google-genai>=1.0.0",
+    "whitenoise>=6.0.0",
+    "dj-database-url>=2.0.0",
+    "psycopg2-binary>=2.9.0",
 ]
 
 [build-system]
