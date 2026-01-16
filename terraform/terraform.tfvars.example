@@ -1,0 +1,13 @@
+# Copy this file to terraform.tfvars and customize
+
+# Required
+bucket_name = "audio-analysis-uploads"
+
+# Optional
+aws_region        = "us-east-1"
+environment       = "production"
+allow_public_read = true
+
+# Restrict CORS to your Railway app URL in production
+# cors_allowed_origins = ["https://your-app.up.railway.app"]
+cors_allowed_origins = ["*"]
