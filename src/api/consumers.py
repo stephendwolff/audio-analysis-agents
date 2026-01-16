@@ -4,7 +4,7 @@ WebSocket Consumer for Streaming Chat
 Handles real-time chat with streaming LLM responses.
 
 Protocol:
-1. Client connects to /ws/chat/{track_id}/?api_key=xxx
+1. Client connects to /ws/chat/{track_id}/?token=<jwt> OR ?api_key=xxx
 2. Client sends: {"type": "question", "text": "What's the tempo?"}
 3. Server streams back:
    - {"type": "tool_call", "tool": "analyse_rhythm"}
@@ -21,6 +21,8 @@ from urllib.parse import parse_qs
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .auth import check_api_key
 from .views import get_track_path
@@ -29,20 +31,37 @@ from .views import get_track_path
 class ChatConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer for streaming audio analysis chat.
+
+    Accepts either:
+    - ?token=<jwt> - JWT authentication
+    - ?api_key=<key> - Legacy API key authentication
     """
 
     async def connect(self):
         """Handle WebSocket connection."""
         self.track_id = self.scope["url_route"]["kwargs"]["track_id"]
+        self.is_demo = False
 
-        # Check API key from query string
+        # Parse query string
         query_string = self.scope.get("query_string", b"").decode()
         params = parse_qs(query_string)
-        api_key = params.get("api_key", [None])[0]
 
-        if not api_key or not check_api_key(api_key):
-            await self.close(code=4001)  # Unauthorized
-            return
+        # Try JWT auth first
+        token = params.get("token", [None])[0]
+        if token:
+            try:
+                access_token = AccessToken(token)
+                self.is_demo = access_token.get("is_demo", False)
+                # JWT is valid
+            except (InvalidToken, TokenError):
+                await self.close(code=4001)  # Unauthorized
+                return
+        else:
+            # Fall back to API key
+            api_key = params.get("api_key", [None])[0]
+            if not api_key or not check_api_key(api_key):
+                await self.close(code=4001)  # Unauthorized
+                return
 
         # Check track exists
         self.track_path = get_track_path(self.track_id)
