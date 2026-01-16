@@ -106,6 +106,29 @@ class MyCustomAgent(BaseAgent):
 - `soundfile` - Audio file I/O
 - `pydantic` - Data validation
 
+## Railway Deployment
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DJANGO_SECRET_KEY` | Yes | Generate a secure random key (50+ chars) |
+| `DJANGO_DEBUG` | Yes | Set to `false` for production |
+| `DJANGO_ALLOWED_HOSTS` | Yes | Set to `.railway.app` (or your custom domain) |
+| `DATABASE_URL` | Auto | Provided automatically by Railway PostgreSQL |
+| `MEDIA_ROOT` | Yes | Set to `/app/data/uploads` (mount volume here) |
+| `API_KEY` | Yes | Your API key for authentication |
+| `LLM_MODEL` | No | LLM model to use (default: `gemini/gemini-2.0-flash`) |
+| `GOOGLE_API_KEY` | Conditional | Required if using Gemini models |
+| `ANTHROPIC_API_KEY` | Conditional | Required if using Claude models |
+
+### Setup Steps
+
+1. Create a new Railway project and add a PostgreSQL database
+2. Add a Volume mounted at `/app/data/uploads` for uploaded audio files
+3. Connect your GitHub repository
+4. Set the environment variables listed above
+
 ## License
 
 MIT
