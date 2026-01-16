@@ -19,68 +19,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+
+# Add parent to path for src imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.orchestrator import LLMRouter
 
 load_dotenv()
-
-# ---------------------------------------------------------------------------
-# Tool Definitions (same schema as real agents, but we won't execute them)
-# ---------------------------------------------------------------------------
-
-TOOL_DECLARATIONS = [
-    types.FunctionDeclaration(
-        name="analyse_spectral",
-        description="Analyse frequency content of audio including FFT, spectrograms, and dominant frequencies",
-        parameters=types.Schema(
-            type=types.Type.OBJECT,
-            properties={
-                "track_id": types.Schema(
-                    type=types.Type.STRING,
-                    description="ID of the audio track to analyse"
-                )
-            },
-            required=["track_id"]
-        )
-    ),
-    types.FunctionDeclaration(
-        name="analyse_temporal",
-        description="Analyse time-domain properties including duration, RMS energy, amplitude envelope, and dynamics",
-        parameters=types.Schema(
-            type=types.Type.OBJECT,
-            properties={
-                "track_id": types.Schema(
-                    type=types.Type.STRING,
-                    description="ID of the audio track to analyse"
-                )
-            },
-            required=["track_id"]
-        )
-    ),
-    types.FunctionDeclaration(
-        name="analyse_rhythm",
-        description="Analyse tempo, beats, BPM, and rhythmic patterns",
-        parameters=types.Schema(
-            type=types.Type.OBJECT,
-            properties={
-                "track_id": types.Schema(
-                    type=types.Type.STRING,
-                    description="ID of the audio track to analyse"
-                )
-            },
-            required=["track_id"]
-        )
-    ),
-]
-
-AUDIO_TOOLS = types.Tool(function_declarations=TOOL_DECLARATIONS)
-
-# Map from tool function names to agent names used in manifest
-TOOL_TO_AGENT = {
-    "analyse_spectral": "spectral",
-    "analyse_temporal": "temporal",
-    "analyse_rhythm": "rhythm",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -98,48 +43,7 @@ class EvalResult:
     error: str | None = None
 
 
-def get_tool_selection(client: genai.Client, question: str, track_id: str) -> list[str]:
-    """
-    Send a question to the LLM and return which tools it wants to call.
-
-    We're not executing the tools - just capturing the selection.
-    """
-    # Build the prompt with track context
-    prompt = f"""You have access to audio analysis tools. The user is asking about audio track '{track_id}'.
-
-User question: {question}
-
-Use the appropriate analysis tool(s) to answer this question."""
-
-    contents = [
-        types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=prompt)]
-        )
-    ]
-
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=contents,
-        config=types.GenerateContentConfig(
-            tools=[AUDIO_TOOLS]
-        )
-    )
-
-    # Extract which tools were called
-    selected_tools = []
-    candidate = response.candidates[0]
-
-    for part in candidate.content.parts:
-        if part.function_call:
-            func_name = part.function_call.name
-            if func_name in TOOL_TO_AGENT:
-                selected_tools.append(TOOL_TO_AGENT[func_name])
-
-    return selected_tools
-
-
-def run_eval(test_case: dict, client: genai.Client, verbose: bool = False) -> EvalResult:
+def run_eval(test_case: dict, router: LLMRouter, verbose: bool = False) -> EvalResult:
     """Run a single eval test case."""
     test_id = test_case["id"]
     question = test_case["question"]
@@ -150,12 +54,11 @@ def run_eval(test_case: dict, client: genai.Client, verbose: bool = False) -> Ev
     track_id = Path(audio_file).stem
 
     try:
-        actual = get_tool_selection(client, question, track_id)
+        # Use the router's get_tool_selection - same code path as production
+        actual = router.get_tool_selection(question, track_id)
         actual_set = set(actual)
 
         # Check if selection matches expected
-        # For single tool: exact match
-        # For multi-tool: must include all expected tools
         passed = actual_set == expected
 
         result = EvalResult(
@@ -218,14 +121,14 @@ def run_all_evals(
         print("No test cases found!")
         return []
 
-    # Create client
-    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    # Create router (disable tracing for evals to reduce noise)
+    router = LLMRouter(enable_tracing=False)
 
     results = []
     for i, test_case in enumerate(test_cases, 1):
         if not verbose:
             print(f"Running test {i}/{len(test_cases)}: {test_case['id']}", end="\r")
-        result = run_eval(test_case, client, verbose=verbose)
+        result = run_eval(test_case, router, verbose=verbose)
         results.append(result)
 
     return results

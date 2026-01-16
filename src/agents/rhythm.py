@@ -90,6 +90,6 @@ class RhythmAgent(BaseAgent):
         # Get BPM axis
         bpms = librosa.tempo_frequencies(tempogram.shape[0], sr=sr)
 
-        # Find peaks
+        # Find peaks (filter out inf and zero values)
         top_indices = np.argsort(avg_tempogram)[-3:][::-1]
-        return [float(bpms[i]) for i in top_indices if bpms[i] > 0]
+        return [float(bpms[i]) for i in top_indices if np.isfinite(bpms[i]) and bpms[i] > 0]
