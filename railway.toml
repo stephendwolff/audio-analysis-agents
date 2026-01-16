@@ -1,2 +1,6 @@
 [build]
 builder = "nixpacks"
+
+[build.nixpacks]
+# Install with api extras
+installCmd = "pip install -e '.[api]'"
