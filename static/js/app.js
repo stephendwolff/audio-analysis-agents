@@ -1,45 +1,110 @@
 /**
  * Audio Analysis Frontend
- *
- * Demonstrates:
- * - File upload via REST API
- * - Streaming chat via WebSocket
- * - API key authentication
  */
 
 // State
 let currentTrackId = null;
 let websocket = null;
+let requestCount = 0;
 
 // DOM Elements
-const configForm = document.getElementById("config-form");
-const apiUrlInput = document.getElementById("api-url");
-const apiKeyInput = document.getElementById("api-key");
+const authSection = document.getElementById("auth-section");
+const authStatus = document.getElementById("auth-status");
+const authButtons = document.getElementById("auth-buttons");
+const demoBtn = document.getElementById("demo-btn");
+const loginBtn = document.getElementById("login-btn");
+const loginForm = document.getElementById("login-form");
+const cancelLoginBtn = document.getElementById("cancel-login");
 const uploadSection = document.getElementById("upload-section");
 const uploadForm = document.getElementById("upload-form");
 const fileInput = document.getElementById("file-input");
 const uploadStatus = document.getElementById("upload-status");
 const chatSection = document.getElementById("chat-section");
 const trackInfo = document.getElementById("track-info");
+const demoInfo = document.getElementById("demo-info");
 const chatMessages = document.getElementById("chat-messages");
 const chatForm = document.getElementById("chat-form");
 const questionInput = document.getElementById("question-input");
 const connectionStatus = document.getElementById("connection-status");
 
-// Initialize with config values
-function initConfig() {
-  apiUrlInput.value = CONFIG.API_BASE_URL;
-  apiKeyInput.value = CONFIG.API_KEY;
-}
+// Auth handlers
+demoBtn.addEventListener("click", async () => {
+  try {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/api/auth/demo/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
 
-// Save config
-configForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  CONFIG.API_BASE_URL = apiUrlInput.value.replace(/\/$/, ""); // Remove trailing slash
-  CONFIG.WS_BASE_URL = CONFIG.API_BASE_URL.replace(/^http/, "ws");
-  CONFIG.API_KEY = apiKeyInput.value;
-  showMessage("Configuration saved", "success");
+    if (!response.ok) throw new Error("Failed to start demo");
+
+    const data = await response.json();
+    CONFIG.ACCESS_TOKEN = data.access;
+    CONFIG.REFRESH_TOKEN = data.refresh;
+    CONFIG.IS_DEMO = true;
+    CONFIG.REQUEST_LIMIT = data.request_limit;
+    requestCount = 0;
+
+    showAuthenticatedUI();
+  } catch (error) {
+    authStatus.textContent = `Error: ${error.message}`;
+    authStatus.className = "status error";
+  }
 });
+
+loginBtn.addEventListener("click", () => {
+  authButtons.style.display = "none";
+  loginForm.style.display = "block";
+});
+
+cancelLoginBtn.addEventListener("click", () => {
+  loginForm.style.display = "none";
+  authButtons.style.display = "block";
+});
+
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  try {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/api/auth/login/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Login failed");
+    }
+
+    const data = await response.json();
+    CONFIG.ACCESS_TOKEN = data.access;
+    CONFIG.REFRESH_TOKEN = data.refresh;
+    CONFIG.IS_DEMO = data.is_demo;
+
+    showAuthenticatedUI();
+  } catch (error) {
+    authStatus.textContent = `Error: ${error.message}`;
+    authStatus.className = "status error";
+  }
+});
+
+function showAuthenticatedUI() {
+  authButtons.style.display = "none";
+  loginForm.style.display = "none";
+
+  if (CONFIG.IS_DEMO) {
+    authStatus.textContent = `Demo mode: ${CONFIG.REQUEST_LIMIT} requests available`;
+  } else {
+    authStatus.textContent = "Logged in";
+  }
+  authStatus.className = "status success";
+
+  uploadSection.style.display = "block";
+}
 
 // Upload file
 uploadForm.addEventListener("submit", async (e) => {
@@ -60,7 +125,7 @@ uploadForm.addEventListener("submit", async (e) => {
     const response = await fetch(`${CONFIG.API_BASE_URL}/api/tracks/`, {
       method: "POST",
       headers: {
-        "X-API-Key": CONFIG.API_KEY,
+        Authorization: `Bearer ${CONFIG.ACCESS_TOKEN}`,
       },
       body: formData,
     });
@@ -75,7 +140,6 @@ uploadForm.addEventListener("submit", async (e) => {
 
     showUploadStatus(`Uploaded: ${data.filename}`, "success");
     showChatSection(data);
-
   } catch (error) {
     showUploadStatus(`Error: ${error.message}`, "error");
   }
@@ -86,8 +150,19 @@ function showChatSection(trackData) {
   chatSection.style.display = "block";
   trackInfo.textContent = `Track: ${trackData.filename} (${trackData.track_id})`;
   chatMessages.innerHTML = "";
+  updateDemoInfo();
 
   connectWebSocket(trackData.track_id);
+}
+
+function updateDemoInfo() {
+  if (CONFIG.IS_DEMO) {
+    const remaining = CONFIG.REQUEST_LIMIT - requestCount;
+    demoInfo.textContent = `Demo: ${remaining} requests remaining`;
+    demoInfo.className = remaining <= 1 ? "status error" : "status info";
+  } else {
+    demoInfo.textContent = "";
+  }
 }
 
 // Connect to WebSocket
@@ -96,7 +171,7 @@ function connectWebSocket(trackId) {
     websocket.close();
   }
 
-  const wsUrl = `${CONFIG.WS_BASE_URL}/ws/chat/${trackId}/?api_key=${encodeURIComponent(CONFIG.API_KEY)}`;
+  const wsUrl = `${CONFIG.WS_BASE_URL}/ws/chat/${trackId}/?token=${encodeURIComponent(CONFIG.ACCESS_TOKEN)}`;
   setConnectionStatus("Connecting...", "info");
 
   websocket = new WebSocket(wsUrl);
@@ -108,7 +183,7 @@ function connectWebSocket(trackId) {
 
   websocket.onclose = (e) => {
     if (e.code === 4001) {
-      setConnectionStatus("Unauthorized - check API key", "error");
+      setConnectionStatus("Unauthorized", "error");
     } else if (e.code === 4004) {
       setConnectionStatus("Track not found", "error");
     } else {
@@ -136,7 +211,7 @@ function handleWebSocketMessage(data) {
       break;
 
     case "tool_result":
-      const status = data.success ? "✓" : "✗";
+      const status = data.success ? "+" : "x";
       addSystemMessage(`Tool ${data.tool}: ${status}`);
       break;
 
@@ -168,13 +243,26 @@ chatForm.addEventListener("submit", (e) => {
     return;
   }
 
+  // Check demo limit
+  if (CONFIG.IS_DEMO && requestCount >= CONFIG.REQUEST_LIMIT) {
+    addErrorMessage("Demo request limit reached. Please login for unlimited access.");
+    return;
+  }
+
   addUserMessage(question);
   questionInput.value = "";
 
-  websocket.send(JSON.stringify({
-    type: "question",
-    text: question,
-  }));
+  if (CONFIG.IS_DEMO) {
+    requestCount++;
+    updateDemoInfo();
+  }
+
+  websocket.send(
+    JSON.stringify({
+      type: "question",
+      text: question,
+    })
+  );
 });
 
 // UI Helpers
@@ -186,11 +274,6 @@ function showUploadStatus(message, type) {
 function setConnectionStatus(message, type) {
   connectionStatus.textContent = message;
   connectionStatus.className = `status ${type}`;
-}
-
-function showMessage(message, type) {
-  // Could use a toast notification here
-  console.log(`[${type}] ${message}`);
 }
 
 function addUserMessage(text) {
@@ -229,6 +312,3 @@ function addErrorMessage(text) {
 function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
-// Initialize
-initConfig();

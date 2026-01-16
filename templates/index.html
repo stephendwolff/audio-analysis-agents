@@ -11,24 +11,30 @@
   <h1>Audio Analysis</h1>
   <p>Upload an audio file and ask questions about it using natural language.</p>
 
-  <!-- Configuration -->
-  <section id="config-section">
-    <h2>Configuration</h2>
-    <form id="config-form">
+  <!-- Auth Section -->
+  <section id="auth-section">
+    <h2>Authentication</h2>
+    <div id="auth-status"></div>
+    <div id="auth-buttons">
+      <button id="demo-btn">Try Demo (5 requests)</button>
+      <button id="login-btn">Login</button>
+    </div>
+    <form id="login-form" style="display: none;">
       <div class="form-group">
-        <label for="api-url">API URL</label>
-        <input type="text" id="api-url" placeholder="http://localhost:8000">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="user@example.com">
       </div>
       <div class="form-group">
-        <label for="api-key">API Key</label>
-        <input type="password" id="api-key" placeholder="your-api-key">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="password">
       </div>
-      <button type="submit">Save Configuration</button>
+      <button type="submit">Login</button>
+      <button type="button" id="cancel-login">Cancel</button>
     </form>
   </section>
 
   <!-- Upload -->
-  <section id="upload-section">
+  <section id="upload-section" style="display: none;">
     <h2>Upload Audio</h2>
     <form id="upload-form">
       <div class="form-group">
@@ -41,9 +47,10 @@
   </section>
 
   <!-- Chat -->
-  <section id="chat-section">
+  <section id="chat-section" style="display: none;">
     <h2>Ask Questions <span id="connection-status" class="status"></span></h2>
     <div id="track-info"></div>
+    <div id="demo-info"></div>
     <div id="chat-messages"></div>
     <form id="chat-form">
       <input type="text" id="question-input" placeholder="What's the tempo of this track?" disabled>

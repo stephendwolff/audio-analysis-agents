@@ -1,20 +1,19 @@
 /**
  * Configuration for the Audio Analysis Frontend
- *
- * These values can be changed without modifying the main app code.
- * In production, you might load these from environment variables
- * or a separate config endpoint.
  */
 
 const CONFIG = {
   // API base URL (no trailing slash)
-  API_BASE_URL: "http://localhost:8000",
-
-  // API key for authentication
-  API_KEY: "dev-api-key",
+  API_BASE_URL: window.location.origin,
 
   // WebSocket base URL (ws:// or wss://)
-  WS_BASE_URL: "ws://localhost:8000",
+  WS_BASE_URL: window.location.origin.replace(/^http/, "ws"),
+
+  // JWT token (set after login/demo)
+  ACCESS_TOKEN: null,
+  REFRESH_TOKEN: null,
+  IS_DEMO: false,
+  REQUEST_LIMIT: 0,
 };
 
 // Make config available globally
