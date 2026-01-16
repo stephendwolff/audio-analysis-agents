@@ -101,10 +101,21 @@ class MyCustomAgent(BaseAgent):
 
 ## Dependencies
 
+**Core:**
 - `librosa` - Audio analysis
 - `numpy` - Numerical operations
 - `soundfile` - Audio file I/O
 - `pydantic` - Data validation
+
+**API (`pip install -e ".[api]"`):**
+- `django` - Web framework
+- `djangorestframework` - REST API
+- `djangorestframework-simplejwt` - JWT authentication
+- `channels` - WebSocket support
+- `gunicorn` / `uvicorn` - Production server
+- `whitenoise` - Static file serving
+- `dj-database-url` - Database URL parsing
+- `psycopg2-binary` - PostgreSQL driver
 
 ## Railway Deployment
 
@@ -121,6 +132,8 @@ class MyCustomAgent(BaseAgent):
 | `LLM_MODEL` | No | LLM model to use (default: `gemini/gemini-2.0-flash`) |
 | `GOOGLE_API_KEY` | Conditional | Required if using Gemini models |
 | `ANTHROPIC_API_KEY` | Conditional | Required if using Claude models |
+| `OPIK_API_KEY` | No | Opik API key for tracing (omit to disable) |
+| `OPIK_PROJECT_NAME` | No | Opik project name (default: `audio-analysis-agents`) |
 
 ### Setup Steps
 
