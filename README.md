@@ -124,10 +124,40 @@ class MyCustomAgent(BaseAgent):
 
 ### Setup Steps
 
-1. Create a new Railway project and add a PostgreSQL database
-2. Add a Volume mounted at `/app/data/uploads` for uploaded audio files
-3. Connect your GitHub repository
-4. Set the environment variables listed above
+#### 1. Create Railway Project
+
+- Go to [railway.app](https://railway.app) and create a new project
+- Select "Deploy from GitHub repo" and connect your repository
+
+#### 2. Add PostgreSQL Database
+
+- In your project, click **+ New** → **Database** → **Add PostgreSQL**
+- Once created, click on the PostgreSQL service
+- Go to **Variables** tab and copy `DATABASE_URL`
+- Go to your app service → **Variables** → **New Variable**
+- Click **Add Reference** → select the PostgreSQL service → select `DATABASE_URL`
+- This automatically links the database URL to your app
+
+#### 3. Add Volume for Media Files
+
+- Click on your app service → **Settings** tab
+- Scroll to **Volumes** section → **+ Add Volume**
+- Set mount path: `/app/data/uploads`
+- Click **Add**
+- Go to **Variables** tab and add: `MEDIA_ROOT` = `/app/data/uploads`
+
+#### 4. Set Environment Variables
+
+In your app service → **Variables** tab, add:
+
+```
+DJANGO_SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_urlsafe(50))">
+DJANGO_DEBUG=false
+DJANGO_ALLOWED_HOSTS=.railway.app
+MEDIA_ROOT=/app/data/uploads
+API_KEY=<your-api-key>
+GOOGLE_API_KEY=<your-google-api-key>
+```
 
 ## License
 
