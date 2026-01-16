@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "description": "Tool selection evaluation manifest",
+  "eval_type": "tool_selection",
+  "test_cases": [
+    {
+      "id": "rhythm-001",
+      "audio_file": "fixtures/click_120bpm.wav",
+      "question": "What is the tempo of this audio?",
+      "expected_tools": ["rhythm"],
+      "category": "single_tool"
+    },
+    {
+      "id": "rhythm-002",
+      "audio_file": "fixtures/click_120bpm.wav",
+      "question": "How many beats per minute is this track?",
+      "expected_tools": ["rhythm"],
+      "category": "single_tool"
+    },
+    {
+      "id": "rhythm-003",
+      "audio_file": "fixtures/click_90bpm.wav",
+      "question": "What's the BPM?",
+      "expected_tools": ["rhythm"],
+      "category": "single_tool"
+    },
+    {
+      "id": "spectral-001",
+      "audio_file": "fixtures/sine_440hz.wav",
+      "question": "What frequency is this tone?",
+      "expected_tools": ["spectral"],
+      "category": "single_tool"
+    },
+    {
+      "id": "spectral-002",
+      "audio_file": "fixtures/sine_440hz.wav",
+      "question": "What are the dominant frequencies in this audio?",
+      "expected_tools": ["spectral"],
+      "category": "single_tool"
+    },
+    {
+      "id": "spectral-003",
+      "audio_file": "fixtures/sine_1000hz.wav",
+      "question": "Analyse the frequency content of this sound",
+      "expected_tools": ["spectral"],
+      "category": "single_tool"
+    },
+    {
+      "id": "temporal-001",
+      "audio_file": "fixtures/fade_out.wav",
+      "question": "How does the volume change over time?",
+      "expected_tools": ["temporal"],
+      "category": "single_tool"
+    },
+    {
+      "id": "temporal-002",
+      "audio_file": "fixtures/fade_out.wav",
+      "question": "What are the dynamics of this audio?",
+      "expected_tools": ["temporal"],
+      "category": "single_tool"
+    },
+    {
+      "id": "temporal-003",
+      "audio_file": "fixtures/silence.wav",
+      "question": "How long is this audio file?",
+      "expected_tools": ["temporal"],
+      "category": "single_tool"
+    },
+    {
+      "id": "multi-001",
+      "audio_file": "fixtures/complex.wav",
+      "question": "Tell me everything about this audio - tempo, frequency content, and dynamics",
+      "expected_tools": ["spectral", "temporal", "rhythm"],
+      "category": "multi_tool"
+    },
+    {
+      "id": "multi-002",
+      "audio_file": "fixtures/complex.wav",
+      "question": "What's the tempo and the main frequency?",
+      "expected_tools": ["spectral", "rhythm"],
+      "category": "multi_tool"
+    },
+    {
+      "id": "multi-003",
+      "audio_file": "fixtures/complex.wav",
+      "question": "Describe this sound fully",
+      "expected_tools": ["spectral", "temporal", "rhythm"],
+      "category": "multi_tool"
+    },
+    {
+      "id": "ambiguous-001",
+      "audio_file": "fixtures/click_120bpm.wav",
+      "question": "What can you tell me about this audio?",
+      "expected_tools": ["spectral", "temporal", "rhythm"],
+      "category": "ambiguous",
+      "notes": "Ambiguous questions should trigger all tools"
+    },
+    {
+      "id": "edge-001",
+      "audio_file": "fixtures/silence.wav",
+      "question": "Is there any audio content here?",
+      "expected_tools": ["temporal"],
+      "category": "edge_case"
+    }
+  ]
+}
