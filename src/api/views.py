@@ -8,8 +8,10 @@ from pathlib import Path
 from django.conf import settings
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .auth import APIKeyAuthentication
 
@@ -23,7 +25,7 @@ class TrackUploadView(APIView):
     Upload an audio file.
 
     POST /api/tracks/
-    Headers: X-API-Key: your-key
+    Headers: Authorization: Bearer <token> OR X-API-Key: your-key
     Body: multipart/form-data with 'file' field
 
     Returns:
@@ -34,7 +36,8 @@ class TrackUploadView(APIView):
         }
     """
 
-    authentication_classes = [APIKeyAuthentication]
+    authentication_classes = [JWTAuthentication, APIKeyAuthentication]
+    permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
     def post(self, request):
@@ -92,7 +95,8 @@ class TrackDetailView(APIView):
     DELETE /api/tracks/{track_id}/
     """
 
-    authentication_classes = [APIKeyAuthentication]
+    authentication_classes = [JWTAuthentication, APIKeyAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, track_id):
         if track_id not in TRACKS:
@@ -126,10 +130,11 @@ class TrackListView(APIView):
     """
     List all tracks.
 
-    GET /api/tracks/
+    GET /api/tracks/list/
     """
 
-    authentication_classes = [APIKeyAuthentication]
+    authentication_classes = [JWTAuthentication, APIKeyAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return Response(list(TRACKS.values()))
