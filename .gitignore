@@ -37,3 +37,7 @@ evals/fixtures/*
 # OS
 .DS_Store
 Thumbs.db
+
+
+.env
+

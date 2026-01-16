@@ -17,6 +17,10 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "ruff>=0.1.0",
 ]
+llm = [
+    "google-genai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
