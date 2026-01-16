@@ -75,14 +75,7 @@ def _load_audio_cached(audio_path: str) -> AudioData:
 
 @tool
 def analyse_spectral(track_id: str) -> dict:
-    """
-    Analyse frequency content of audio. Returns spectral centroid (brightness),
-    bandwidth, rolloff, flatness (tonal vs noisy), dominant frequencies, and MFCC summary.
-    Use for questions about frequency, pitch, tone, timbre, or 'what does it sound like'.
-
-    Args:
-        track_id: ID or path of the audio track to analyse
-    """
+    """Analyse frequency content of audio. Returns spectral centroid (brightness), bandwidth, rolloff, flatness (tonal vs noisy), dominant frequencies, and MFCC summary. Use for questions about frequency, pitch, tone, timbre, or 'what does it sound like'."""
     # Use the current audio path if track_id doesn't exist as a file
     audio_path = track_id if Path(track_id).exists() else _current_audio_path
 
@@ -98,14 +91,7 @@ def analyse_spectral(track_id: str) -> dict:
 
 @tool
 def analyse_temporal(track_id: str) -> dict:
-    """
-    Analyse time-domain properties of audio. Returns duration, RMS energy (loudness),
-    peak amplitude, dynamic range, zero crossing rate, and amplitude envelope.
-    Use for questions about duration, volume, dynamics, loudness, or energy.
-
-    Args:
-        track_id: ID or path of the audio track to analyse
-    """
+    """Analyse time-domain properties of audio. Returns duration, RMS energy (loudness), peak amplitude, dynamic range, zero crossing rate, and amplitude envelope. Use for questions about duration, volume, dynamics, loudness, or energy."""
     audio_path = track_id if Path(track_id).exists() else _current_audio_path
 
     with trace_tool_execution("temporal", audio_path):
@@ -120,14 +106,7 @@ def analyse_temporal(track_id: str) -> dict:
 
 @tool
 def analyse_rhythm(track_id: str) -> dict:
-    """
-    Analyse tempo and rhythmic properties of audio. Returns estimated BPM,
-    beat positions, onset times, and tempo stability.
-    Use for questions about tempo, BPM, beats, rhythm, or timing.
-
-    Args:
-        track_id: ID or path of the audio track to analyse
-    """
+    """Analyse tempo and rhythmic properties of audio. Returns estimated BPM, beat positions, onset times, and tempo stability. Use for questions about tempo, BPM, beats, rhythm, or timing."""
     audio_path = track_id if Path(track_id).exists() else _current_audio_path
 
     with trace_tool_execution("rhythm", audio_path):
