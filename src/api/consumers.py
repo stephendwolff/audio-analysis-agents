@@ -183,13 +183,17 @@ Use the appropriate analysis tool(s) to answer this question."""
             logger.info("LLM response received")
 
             assistant_message = response.choices[0].message
+            logger.info(f"Tool calls: {assistant_message.tool_calls}, Content: {bool(assistant_message.content)}")
 
             # Handle tool calls
             if assistant_message.tool_calls:
+                logger.info(f"Processing {len(assistant_message.tool_calls)} tool calls")
                 messages.append(assistant_message.model_dump())
 
                 # Load audio once
+                logger.info(f"Loading audio from: {self.track_path}")
                 audio = load_audio(self.track_path, target_sr=22050, mono=True)
+                logger.info("Audio loaded successfully")
 
                 for tool_call in assistant_message.tool_calls:
                     tool_name = tool_call.function.name
@@ -228,6 +232,7 @@ Use the appropriate analysis tool(s) to answer this question."""
 
             elif assistant_message.content:
                 # Direct response without tools
+                logger.info("Sending direct response (no tools)")
                 await self.send_json({
                     "type": "token",
                     "text": assistant_message.content,
@@ -236,6 +241,8 @@ Use the appropriate analysis tool(s) to answer this question."""
                     "type": "done",
                     "full_response": assistant_message.content,
                 })
+            else:
+                logger.warning("No tool calls and no content in response")
 
         except Exception as e:
             logger.exception(f"Error processing question: {e}")
