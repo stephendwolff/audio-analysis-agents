@@ -1,5 +1,7 @@
 """Audio file loading utilities."""
 
+import io
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -27,29 +29,50 @@ class AudioData:
         return self.channels == 1
 
 
+def _is_url(path: str) -> bool:
+    """Check if path is a URL."""
+    return path.startswith("http://") or path.startswith("https://")
+
+
+def _download_to_buffer(url: str) -> io.BytesIO:
+    """Download a URL to an in-memory buffer."""
+    with urllib.request.urlopen(url) as response:
+        data = response.read()
+    return io.BytesIO(data)
+
+
 def load_audio(
     file_path: str | Path,
     target_sr: Optional[int] = None,
     mono: bool = True,
 ) -> AudioData:
     """
-    Load an audio file.
+    Load an audio file from a local path or URL.
 
     Args:
-        file_path: Path to the audio file
+        file_path: Path to the audio file or URL
         target_sr: Target sample rate (None to keep original)
         mono: Convert to mono if True
 
     Returns:
         AudioData containing the loaded audio
     """
-    file_path = Path(file_path)
+    file_path_str = str(file_path)
 
-    if not file_path.exists():
-        raise FileNotFoundError(f"Audio file not found: {file_path}")
-
-    # Load with soundfile
-    samples, sample_rate = sf.read(file_path, always_2d=True)
+    if _is_url(file_path_str):
+        # Download from URL and load from memory
+        try:
+            buffer = _download_to_buffer(file_path_str)
+            samples, sample_rate = sf.read(buffer, always_2d=True)
+        except Exception as e:
+            raise FileNotFoundError(f"Could not load audio from URL: {file_path_str}. Error: {e}")
+        source_path = None
+    else:
+        file_path = Path(file_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {file_path}")
+        samples, sample_rate = sf.read(file_path, always_2d=True)
+        source_path = file_path
 
     # Convert to mono if requested
     if mono and samples.shape[1] > 1:
@@ -76,5 +99,5 @@ def load_audio(
         sample_rate=sample_rate,
         duration=duration,
         channels=channels,
-        file_path=file_path,
+        file_path=source_path,
     )
