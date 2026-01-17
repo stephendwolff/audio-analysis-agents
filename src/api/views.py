@@ -2,7 +2,6 @@
 API Views for audio upload and track management.
 """
 
-import uuid
 from pathlib import Path
 
 from django.conf import settings
@@ -15,10 +14,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .auth import APIKeyAuthentication
-
-
-# In-memory track storage (for demo - use database in production)
-TRACKS: dict[str, dict] = {}
+from .models import Track
 
 
 class TrackUploadView(APIView):
@@ -33,7 +29,7 @@ class TrackUploadView(APIView):
         {
             "track_id": "uuid",
             "filename": "original.wav",
-            "path": "/media/uploads/uuid.wav"
+            "status": "pending"
         }
     """
 
@@ -59,28 +55,32 @@ class TrackUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Generate track ID and save file
-        track_id = str(uuid.uuid4())
-        filename = f"{track_id}{ext}"
-
         # Save using Django's storage backend (works with both local and S3)
+        # Use a temp filename first, then rename with track ID
+        import uuid
+        track_id = uuid.uuid4()
+        filename = f"{track_id}{ext}"
         saved_path = default_storage.save(filename, uploaded_file)
         file_url = default_storage.url(saved_path)
 
-        # Store track info
-        TRACKS[track_id] = {
-            "track_id": track_id,
-            "original_filename": uploaded_file.name,
-            "filename": filename,
-            "storage_path": saved_path,
-            "url": file_url,
-            "size": uploaded_file.size,
-        }
+        # Create Track in database
+        track = Track.objects.create(
+            id=track_id,
+            original_filename=uploaded_file.name,
+            storage_path=saved_path,
+            file_url=file_url,
+            file_size=uploaded_file.size,
+            user=request.user if request.user.is_authenticated else None,
+        )
+
+        # Queue background analysis
+        from src.tasks.analysis import analyze_track
+        analyze_track.delay(str(track.id))
 
         return Response({
-            "track_id": track_id,
+            "track_id": str(track.id),
             "filename": uploaded_file.name,
-            "path": file_url,
+            "status": track.status,
         }, status=status.HTTP_201_CREATED)
 
 
@@ -96,29 +96,42 @@ class TrackDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, track_id):
-        if track_id not in TRACKS:
+        try:
+            track = Track.objects.get(id=track_id)
+        except Track.DoesNotExist:
             return Response(
                 {"error": "Track not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        return Response(TRACKS[track_id])
+        return Response({
+            "track_id": str(track.id),
+            "original_filename": track.original_filename,
+            "storage_path": track.storage_path,
+            "url": track.file_url,
+            "size": track.file_size,
+            "duration": track.duration,
+            "status": track.status,
+            "status_message": track.status_message,
+            "created_at": track.created_at.isoformat(),
+            "analyzed_at": track.analyzed_at.isoformat() if track.analyzed_at else None,
+        })
 
     def delete(self, request, track_id):
-        if track_id not in TRACKS:
+        try:
+            track = Track.objects.get(id=track_id)
+        except Track.DoesNotExist:
             return Response(
                 {"error": "Track not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         # Delete file using storage backend
-        track = TRACKS[track_id]
-        storage_path = track.get("storage_path", track.get("filename"))
-        if default_storage.exists(storage_path):
-            default_storage.delete(storage_path)
+        if default_storage.exists(track.storage_path):
+            default_storage.delete(track.storage_path)
 
-        # Remove from storage
-        del TRACKS[track_id]
+        # Delete from database
+        track.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -134,7 +147,32 @@ class TrackListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(list(TRACKS.values()))
+        # Filter by user if authenticated
+        if request.user.is_authenticated:
+            tracks = Track.objects.filter(user=request.user)
+        else:
+            tracks = Track.objects.none()
+
+        return Response([
+            {
+                "track_id": str(t.id),
+                "original_filename": t.original_filename,
+                "status": t.status,
+                "duration": t.duration,
+                "created_at": t.created_at.isoformat(),
+            }
+            for t in tracks
+        ])
+
+
+def get_track(track_id: str) -> Track | None:
+    """
+    Get a Track instance by ID. Used by WebSocket consumer.
+    """
+    try:
+        return Track.objects.get(id=track_id)
+    except Track.DoesNotExist:
+        return None
 
 
 def get_track_path(track_id: str) -> str | None:
@@ -144,18 +182,16 @@ def get_track_path(track_id: str) -> str | None:
     For local storage, returns the filesystem path.
     For S3 storage, returns the S3 URL (agent needs to handle this).
     """
-    if track_id not in TRACKS:
+    track = get_track(track_id)
+    if not track:
         return None
-
-    track = TRACKS[track_id]
-    storage_path = track.get("storage_path", track.get("filename"))
 
     # For local storage, return the actual file path
     # For S3, return the URL
     if hasattr(default_storage, "path"):
         try:
-            return default_storage.path(storage_path)
+            return default_storage.path(track.storage_path)
         except NotImplementedError:
             # S3 doesn't support path(), return URL instead
-            return track.get("url")
-    return track.get("url")
+            return track.file_url
+    return track.file_url

@@ -6,6 +6,7 @@
 let currentTrackId = null;
 let websocket = null;
 let requestCount = 0;
+let trackStatus = "pending";
 
 // Reconnection state
 let reconnectAttempts = 0;
@@ -154,9 +155,13 @@ uploadForm.addEventListener("submit", async (e) => {
 // Show chat section and connect WebSocket
 function showChatSection(trackData) {
   chatSection.style.display = "block";
-  trackInfo.textContent = `Track: ${trackData.filename} (${trackData.track_id})`;
+  trackInfo.textContent = `Track: ${trackData.filename}`;
   chatMessages.innerHTML = "";
   updateDemoInfo();
+
+  // Reset track status
+  trackStatus = trackData.status || "pending";
+  updateTrackStatus(trackStatus, "Connecting...");
 
   connectWebSocket(trackData.track_id);
 }
@@ -169,6 +174,39 @@ function updateDemoInfo() {
   } else {
     demoInfo.textContent = "";
   }
+}
+
+// Update track status display and input state
+function updateTrackStatus(status, message) {
+  trackStatus = status;
+
+  // Update track info with status
+  const statusText = message || getStatusMessage(status);
+  trackInfo.textContent = statusText;
+
+  // Disable input unless track is ready AND connected
+  const isReady = status === "ready";
+  const isConnected = websocket && websocket.readyState === WebSocket.OPEN;
+  questionInput.disabled = !(isReady && isConnected);
+
+  // Update placeholder text
+  if (!isReady) {
+    questionInput.placeholder = "Waiting for analysis to complete...";
+  } else if (!isConnected) {
+    questionInput.placeholder = "Connecting...";
+  } else {
+    questionInput.placeholder = "Ask a question about your audio...";
+  }
+}
+
+function getStatusMessage(status) {
+  const messages = {
+    pending: "Waiting to start analysis...",
+    analyzing: "Analyzing audio...",
+    ready: "Ready for questions",
+    failed: "Analysis failed",
+  };
+  return messages[status] || status;
 }
 
 // Connect to WebSocket
@@ -193,8 +231,10 @@ function connectWebSocket(trackId, isReconnect = false) {
 
   websocket.onopen = () => {
     setConnectionStatus("Connected", "success");
-    questionInput.disabled = false;
     reconnectAttempts = 0; // Reset on successful connection
+
+    // Update input state based on track status
+    updateTrackStatus(trackStatus, null);
   };
 
   websocket.onclose = (e) => {
@@ -245,6 +285,23 @@ let currentResponseElement = null;
 
 function handleWebSocketMessage(data) {
   switch (data.type) {
+    case "status":
+      // Track status update from server
+      updateTrackStatus(data.status, data.message);
+      if (data.status === "analyzing" || data.status === "pending") {
+        addSystemMessage(data.message);
+      } else if (data.status === "ready") {
+        addSystemMessage("Analysis complete. You can now ask questions.");
+      } else if (data.status === "failed") {
+        addErrorMessage(`Analysis failed: ${data.message}`);
+      }
+      break;
+
+    case "thinking":
+      // Analysis progress from Celery worker
+      addThinkingMessage(data.message);
+      break;
+
     case "tool_call":
       addSystemMessage(`Calling tool: ${data.tool}`);
       break;
@@ -279,6 +336,12 @@ chatForm.addEventListener("submit", (e) => {
 
   const question = questionInput.value.trim();
   if (!question || !websocket || websocket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  // Check if track is ready
+  if (trackStatus !== "ready") {
+    addErrorMessage("Please wait for analysis to complete before asking questions.");
     return;
   }
 
@@ -335,6 +398,14 @@ function addAssistantMessage(text) {
 function addSystemMessage(text) {
   const div = document.createElement("div");
   div.className = "message system";
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  scrollToBottom();
+}
+
+function addThinkingMessage(text) {
+  const div = document.createElement("div");
+  div.className = "message thinking";
   div.textContent = text;
   chatMessages.appendChild(div);
   scrollToBottom();

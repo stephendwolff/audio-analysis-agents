@@ -3,8 +3,10 @@
 import numpy as np
 
 from .base import BaseAgent, AnalysisResult
+from .registry import register_agent
 
 
+@register_agent
 class TemporalAgent(BaseAgent):
     """Agent for time domain analysis."""
 

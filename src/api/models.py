@@ -2,8 +2,49 @@
 API Models
 """
 
+import uuid
+
 from django.contrib.auth.models import User
 from django.db import models
+
+
+class Track(models.Model):
+    """Audio track with cached analysis results."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+
+    # File info
+    original_filename = models.CharField(max_length=255)
+    storage_path = models.CharField(max_length=500)
+    file_url = models.URLField(max_length=500, blank=True)
+    file_size = models.PositiveIntegerField()
+    duration = models.FloatField(null=True)
+
+    # Ownership
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+
+    # Status
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        ANALYZING = "analyzing"
+        READY = "ready"
+        FAILED = "failed"
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    status_message = models.TextField(blank=True)
+
+    # Analysis results
+    analysis = models.JSONField(default=dict)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    analyzed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.status})"
 
 
 class UserProfile(models.Model):
