@@ -192,8 +192,13 @@ Use the appropriate analysis tool(s) to answer this question."""
 
                 # Load audio once
                 logger.info(f"Loading audio from: {self.track_path}")
-                audio = load_audio(self.track_path, target_sr=22050, mono=True)
-                logger.info("Audio loaded successfully")
+                try:
+                    audio = load_audio(self.track_path, target_sr=22050, mono=True)
+                    logger.info(f"Audio loaded successfully: {audio.duration:.1f}s, {audio.sample_rate}Hz")
+                except Exception as audio_err:
+                    logger.exception(f"Failed to load audio: {audio_err}")
+                    await self.send_error(f"Failed to load audio: {audio_err}")
+                    return
 
                 for tool_call in assistant_message.tool_calls:
                     tool_name = tool_call.function.name
