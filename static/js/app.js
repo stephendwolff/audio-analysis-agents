@@ -7,6 +7,12 @@ let currentTrackId = null;
 let websocket = null;
 let requestCount = 0;
 
+// Reconnection state
+let reconnectAttempts = 0;
+let reconnectTimeout = null;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_RECONNECT_DELAY = 1000; // 1 second
+
 // DOM Elements
 const authSection = document.getElementById("auth-section");
 const authStatus = document.getElementById("auth-status");
@@ -166,39 +172,72 @@ function updateDemoInfo() {
 }
 
 // Connect to WebSocket
-function connectWebSocket(trackId) {
+function connectWebSocket(trackId, isReconnect = false) {
+  // Clear any pending reconnect
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+
   if (websocket) {
     websocket.close();
   }
 
+  // Store trackId for reconnection
+  currentTrackId = trackId;
+
   const wsUrl = `${CONFIG.WS_BASE_URL}/ws/chat/${trackId}/?token=${encodeURIComponent(CONFIG.ACCESS_TOKEN)}`;
-  setConnectionStatus("Connecting...", "info");
+  setConnectionStatus(isReconnect ? `Reconnecting (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...` : "Connecting...", "info");
 
   websocket = new WebSocket(wsUrl);
 
   websocket.onopen = () => {
     setConnectionStatus("Connected", "success");
     questionInput.disabled = false;
+    reconnectAttempts = 0; // Reset on successful connection
   };
 
   websocket.onclose = (e) => {
+    questionInput.disabled = true;
+
+    // Don't reconnect for auth/not-found errors
     if (e.code === 4001) {
       setConnectionStatus("Unauthorized", "error");
-    } else if (e.code === 4004) {
+      reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Prevent reconnection
+      return;
+    }
+    if (e.code === 4004) {
       setConnectionStatus("Track not found", "error");
+      reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // Prevent reconnection
+      return;
+    }
+
+    // Attempt reconnection for other disconnects
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS && currentTrackId) {
+      scheduleReconnect(currentTrackId);
     } else {
       setConnectionStatus("Disconnected", "error");
     }
-    questionInput.disabled = true;
   };
 
   websocket.onerror = () => {
+    // onerror is always followed by onclose, so reconnection is handled there
     setConnectionStatus("Connection error", "error");
   };
 
   websocket.onmessage = (event) => {
     handleWebSocketMessage(JSON.parse(event.data));
   };
+}
+
+function scheduleReconnect(trackId) {
+  reconnectAttempts++;
+  const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1); // Exponential backoff
+  setConnectionStatus(`Reconnecting in ${delay / 1000}s...`, "info");
+
+  reconnectTimeout = setTimeout(() => {
+    connectWebSocket(trackId, true);
+  }, delay);
 }
 
 // Handle incoming WebSocket messages
