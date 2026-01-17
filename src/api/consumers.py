@@ -16,10 +16,13 @@ Protocol:
 """
 
 import json
+import logging
 import os
 from urllib.parse import parse_qs
 
 from channels.generic.websocket import AsyncWebsocketConsumer
+
+logger = logging.getLogger(__name__)
 from django.conf import settings
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import AccessToken
@@ -77,6 +80,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         """Handle incoming message from client."""
+        logger.info(f"Received message: {text_data[:200]}")
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
@@ -91,6 +95,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.send_error("Empty question")
                 return
 
+            logger.info(f"Processing question: {question}")
             await self.process_question(question)
 
         else:
@@ -168,12 +173,14 @@ Use the appropriate analysis tool(s) to answer this question."""
         model = getattr(settings, "LLM_MODEL", "gemini/gemini-2.0-flash")
 
         try:
+            logger.info(f"Calling LLM: {model}")
             # First call - might return tool calls
             response = litellm.completion(
                 model=model,
                 messages=messages,
                 tools=tools,
             )
+            logger.info("LLM response received")
 
             assistant_message = response.choices[0].message
 
@@ -231,6 +238,7 @@ Use the appropriate analysis tool(s) to answer this question."""
                 })
 
         except Exception as e:
+            logger.exception(f"Error processing question: {e}")
             await self.send_error(str(e))
 
     async def stream_response(self, model: str, messages: list):
