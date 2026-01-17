@@ -74,8 +74,27 @@ class TrackUploadView(APIView):
         )
 
         # Queue background analysis
-        from src.tasks.analysis import analyze_track
-        analyze_track.delay(str(track.id))
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            from src.tasks.analysis import analyze_track
+            analyze_track.delay(str(track.id))
+            logger.info(f"Queued analysis task for track {track.id}")
+        except Exception as e:
+            # If Celery/Redis unavailable, run synchronously as fallback
+            logger.warning(f"Failed to queue task (running sync): {e}")
+            try:
+                from src.tasks.analysis import analyze_track
+                analyze_track(str(track.id))
+            except Exception as sync_err:
+                logger.error(f"Sync analysis also failed: {sync_err}")
+                track.status = Track.Status.FAILED
+                track.status_message = f"Analysis failed: {sync_err}"
+                track.save(update_fields=["status", "status_message"])
+
+        # Refresh track to get updated status (in case sync analysis ran)
+        track.refresh_from_db()
 
         return Response({
             "track_id": str(track.id),
