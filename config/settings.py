@@ -3,6 +3,7 @@ Django settings for audio-analysis-agents project.
 """
 
 import os
+import warnings
 from datetime import timedelta
 from pathlib import Path
 
@@ -10,6 +11,13 @@ import dj_database_url
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Suppress WhiteNoise async warning (harmless, static files served sync in ASGI)
+warnings.filterwarnings(
+    "ignore",
+    message="StreamingHttpResponse must consume synchronous iterators",
+    category=Warning,
+)
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
