@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "storages",
     "channels",
+    "django_celery_results",
     "src.api",
 ]
 
@@ -75,11 +76,14 @@ DATABASES = {
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = "django-db"  # Store results in PostgreSQL via django-celery-results
+CELERY_CACHE_BACKEND = "django-cache"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True  # Track when tasks start
+CELERY_RESULT_EXTENDED = True  # Store additional task metadata
 
 # Channel Layers - Redis in production, in-memory for development
 CHANNEL_LAYERS_BACKEND = os.getenv("CHANNEL_LAYERS_BACKEND")
