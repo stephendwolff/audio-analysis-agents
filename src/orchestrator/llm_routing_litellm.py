@@ -87,58 +87,51 @@ Use the appropriate analysis tool(s) to answer this question. After receiving th
         messages = [{"role": "user", "content": self._build_prompt(question, track_id)}]
         tools = get_tool_schemas_openai()
 
-        with trace_llm_call(self.model, question, tools=[t["function"]["name"] for t in tools]):
-            while True:
-                response = await litellm.acompletion(
-                    model=self.model,
-                    messages=messages,
-                    tools=tools,
-                )
-
-                msg = response.choices[0].message
-
-                if msg.tool_calls:
-                    # Add assistant message to history
-                    messages.append(msg.model_dump())
-
-                    for tc in msg.tool_calls:
-                        tool_name = tc.function.name
-                        agent_name = tool_name.replace("analyse_", "")
-
-                        yield {"type": "tool_call", "tool": tool_name}
-
-                        with trace_tool_execution(agent_name, track_id):
-                            try:
-                                result = await sync_to_async(self.provider.get_analysis)(
-                                    agent_name, track_id
-                                )
-                                tool_result = {"success": True, "data": result}
-                                yield {"type": "tool_result", "tool": tool_name, "success": True}
-                            except Exception as e:
-                                tool_result = {"success": False, "error": str(e)}
-                                yield {"type": "tool_result", "tool": tool_name, "success": False}
-
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc.id,
-                            "content": json.dumps(tool_result),
-                        })
-
-                else:
-                    # Stream final response
-                    full_response = ""
-
-                    stream = await litellm.acompletion(
+        try:
+            with trace_llm_call(self.model, question, tools=[t["function"]["name"] for t in tools]):
+                while True:
+                    response = await litellm.acompletion(
                         model=self.model,
                         messages=messages,
-                        stream=True,
+                        tools=tools,
                     )
 
-                    async for chunk in stream:
-                        if chunk.choices[0].delta.content:
-                            token = chunk.choices[0].delta.content
-                            full_response += token
-                            yield {"type": "token", "text": token}
+                    msg = response.choices[0].message
 
-                    yield {"type": "done", "full_response": full_response}
-                    return
+                    if msg.tool_calls:
+                        # Add assistant message to history
+                        messages.append(msg.model_dump())
+
+                        for tc in msg.tool_calls:
+                            tool_name = tc.function.name
+                            agent_name = tool_name.replace("analyse_", "")
+
+                            yield {"type": "tool_call", "tool": tool_name}
+
+                            with trace_tool_execution(agent_name, track_id):
+                                try:
+                                    result = await sync_to_async(self.provider.get_analysis)(
+                                        agent_name, track_id
+                                    )
+                                    tool_result = {"success": True, "data": result}
+                                    yield {"type": "tool_result", "tool": tool_name, "success": True}
+                                except Exception as e:
+                                    tool_result = {"success": False, "error": str(e)}
+                                    yield {"type": "tool_result", "tool": tool_name, "success": False}
+
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tc.id,
+                                "content": json.dumps(tool_result),
+                            })
+
+                    else:
+                        # No tool calls - use response content directly (no second API call needed)
+                        content = msg.content or ""
+                        if content:
+                            yield {"type": "token", "text": content}
+                        yield {"type": "done", "full_response": content}
+                        return
+        except Exception as e:
+            yield {"type": "error", "message": str(e)}
+            return
