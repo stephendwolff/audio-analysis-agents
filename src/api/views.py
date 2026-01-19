@@ -73,21 +73,14 @@ class TrackUploadView(APIView):
             user=request.user if request.user.is_authenticated else None,
         )
 
-        # Queue background analysis
+        # Queue background analysis using fat model method
         import logging
         logger = logging.getLogger(__name__)
-        task_id = None
-
-        try:
-            from src.tasks.analysis import analyze_track
-            result = analyze_track.delay(str(track.id))
-            task_id = result.id
+        task_id = track.queue_analysis()
+        if task_id:
             logger.info(f"Queued analysis task {task_id} for track {track.id}")
-        except Exception as e:
-            logger.error(f"Failed to queue analysis task for track {track.id}: {e}")
-            track.status = Track.Status.FAILED
-            track.status_message = f"Failed to queue analysis: {e}"
-            track.save(update_fields=["status", "status_message"])
+        else:
+            logger.error(f"Failed to queue analysis task for track {track.id}")
 
         # Refresh track to get current status
         track.refresh_from_db()
@@ -115,9 +108,8 @@ class TrackDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, track_id):
-        try:
-            track = Track.objects.get(id=track_id)
-        except Track.DoesNotExist:
+        track = Track.get_or_none(track_id)
+        if track is None:
             return Response(
                 {"error": "Track not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -137,9 +129,8 @@ class TrackDetailView(APIView):
         })
 
     def delete(self, request, track_id):
-        try:
-            track = Track.objects.get(id=track_id)
-        except Track.DoesNotExist:
+        track = Track.get_or_none(track_id)
+        if track is None:
             return Response(
                 {"error": "Track not found"},
                 status=status.HTTP_404_NOT_FOUND
@@ -182,35 +173,3 @@ class TrackListView(APIView):
             }
             for t in tracks
         ])
-
-
-def get_track(track_id: str) -> Track | None:
-    """
-    Get a Track instance by ID. Used by WebSocket consumer.
-    """
-    try:
-        return Track.objects.get(id=track_id)
-    except Track.DoesNotExist:
-        return None
-
-
-def get_track_path(track_id: str) -> str | None:
-    """
-    Get the file path for a track ID. Used by WebSocket consumer.
-
-    For local storage, returns the filesystem path.
-    For S3 storage, returns the S3 URL (agent needs to handle this).
-    """
-    track = get_track(track_id)
-    if not track:
-        return None
-
-    # For local storage, return the actual file path
-    # For S3, return the URL
-    if hasattr(default_storage, "path"):
-        try:
-            return default_storage.path(track.storage_path)
-        except NotImplementedError:
-            # S3 doesn't support path(), return URL instead
-            return track.file_url
-    return track.file_url
