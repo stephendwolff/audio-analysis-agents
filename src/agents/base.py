@@ -22,8 +22,15 @@ class AnalysisResult(BaseModel):
 class BaseAgent(ABC):
     """Base class for analysis agents."""
 
-    name: str = "base"
-    description: str = "Base analysis agent"
+    name: str
+    description: str
+
+    def __init__(self):
+        # Validate required class attributes
+        if not hasattr(self, 'name') or not self.name:
+            raise TypeError(f"{self.__class__.__name__} must define 'name'")
+        if not hasattr(self, 'description') or not self.description:
+            raise TypeError(f"{self.__class__.__name__} must define 'description'")
 
     @abstractmethod
     def analyse(self, samples: np.ndarray, sample_rate: int) -> AnalysisResult:
