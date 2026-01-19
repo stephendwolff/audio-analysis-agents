@@ -1,5 +1,6 @@
 # tests/test_api/test_models.py
 import pytest
+from unittest.mock import patch, MagicMock
 from django.test import TestCase
 from src.api.models import Track
 
@@ -115,3 +116,68 @@ class TestTrackModel(TestCase):
         track.set_analysis("rhythm", {"bpm": 120})
         track.refresh_from_db()
         assert track.analysis["rhythm"] == {"bpm": 120}
+
+    def test_queue_analysis_returns_task_id(self):
+        """queue_analysis returns task ID on success."""
+        track = Track.objects.create(
+            original_filename="test.wav",
+            storage_path="test.wav",
+            file_size=1000,
+        )
+        with patch("src.tasks.analysis.analyze_track") as mock_task:
+            mock_result = MagicMock()
+            mock_result.id = "task-123"
+            mock_task.delay.return_value = mock_result
+
+            result = track.queue_analysis()
+
+            assert result == "task-123"
+            mock_task.delay.assert_called_once_with(str(track.id))
+
+    def test_queue_analysis_sets_failed_status_on_error(self):
+        """queue_analysis sets FAILED status when queueing fails."""
+        track = Track.objects.create(
+            original_filename="test.wav",
+            storage_path="test.wav",
+            file_size=1000,
+            status=Track.Status.PENDING,
+        )
+        with patch("src.tasks.analysis.analyze_track") as mock_task:
+            mock_task.delay.side_effect = Exception("Broker unavailable")
+
+            result = track.queue_analysis()
+
+            assert result is None
+            track.refresh_from_db()
+            assert track.status == Track.Status.FAILED
+            assert "Broker unavailable" in track.status_message
+
+    def test_file_path_returns_filesystem_path_when_available(self):
+        """file_path returns filesystem path from storage backend."""
+        track = Track.objects.create(
+            original_filename="test.wav",
+            storage_path="uploads/test.wav",
+            file_url="https://cdn.example.com/test.wav",
+            file_size=1000,
+        )
+        with patch("django.core.files.storage.default_storage") as mock_storage:
+            mock_storage.path.return_value = "/var/uploads/test.wav"
+
+            result = track.file_path
+
+            assert result == "/var/uploads/test.wav"
+
+    def test_file_path_falls_back_to_url_when_path_not_implemented(self):
+        """file_path returns file_url when storage has no path method."""
+        track = Track.objects.create(
+            original_filename="test.wav",
+            storage_path="uploads/test.wav",
+            file_url="https://cdn.example.com/test.wav",
+            file_size=1000,
+        )
+        with patch("django.core.files.storage.default_storage") as mock_storage:
+            mock_storage.path.side_effect = NotImplementedError()
+
+            result = track.file_path
+
+            assert result == "https://cdn.example.com/test.wav"
