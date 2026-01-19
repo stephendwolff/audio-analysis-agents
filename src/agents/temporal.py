@@ -8,10 +8,14 @@ from .registry import register_agent
 
 @register_agent
 class TemporalAgent(BaseAgent):
-    """Agent for time domain analysis."""
+    """Agent for time-domain analysis."""
 
     name = "temporal"
-    description = "Time domain analysis (waveform, envelope, dynamics)"
+    description = (
+        "Analyse time-domain properties of audio. Returns duration, RMS energy (loudness), "
+        "peak amplitude, dynamic range, zero crossing rate, and amplitude envelope. "
+        "Use for questions about duration, volume, dynamics, loudness, or energy."
+    )
 
     def analyse(self, samples: np.ndarray, sample_rate: int) -> AnalysisResult:
         """

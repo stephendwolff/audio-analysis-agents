@@ -8,10 +8,14 @@ from .registry import register_agent
 
 @register_agent
 class SpectralAgent(BaseAgent):
-    """Agent for frequency domain analysis."""
+    """Agent for spectral/frequency analysis."""
 
     name = "spectral"
-    description = "Frequency domain analysis (FFT, spectrograms, spectral features)"
+    description = (
+        "Analyse frequency content of audio. Returns spectral centroid (brightness), "
+        "bandwidth, rolloff, flatness (tonal vs noisy), dominant frequencies, and MFCC summary. "
+        "Use for questions about frequency, pitch, tone, timbre, or 'what does it sound like'."
+    )
 
     def analyse(self, samples: np.ndarray, sample_rate: int) -> AnalysisResult:
         """

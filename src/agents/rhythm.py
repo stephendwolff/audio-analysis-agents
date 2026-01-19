@@ -8,10 +8,14 @@ from .registry import register_agent
 
 @register_agent
 class RhythmAgent(BaseAgent):
-    """Agent for rhythmic analysis."""
+    """Agent for rhythm and tempo analysis."""
 
     name = "rhythm"
-    description = "Rhythmic analysis (BPM, beats, onsets)"
+    description = (
+        "Analyse tempo and rhythmic properties of audio. Returns estimated BPM, "
+        "beat positions, onset times, and tempo stability. "
+        "Use for questions about tempo, BPM, beats, rhythm, or timing."
+    )
 
     def analyse(self, samples: np.ndarray, sample_rate: int) -> AnalysisResult:
         """
