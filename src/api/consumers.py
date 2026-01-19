@@ -29,7 +29,6 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from .auth import check_api_key
 from .models import Track
-from .views import get_track
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Check track exists in database
         from asgiref.sync import sync_to_async
-        self.track = await sync_to_async(get_track)(self.track_id)
+        self.track = await sync_to_async(Track.get_or_none)(self.track_id)
         if not self.track:
             await self.close(code=4004)  # Not found
             return
@@ -105,7 +104,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         from asgiref.sync import sync_to_async
 
         # Refresh track from database
-        self.track = await sync_to_async(get_track)(self.track_id)
+        self.track = await sync_to_async(Track.get_or_none)(self.track_id)
         if not self.track:
             return
 
@@ -166,187 +165,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def process_question(self, question: str):
         """
-        Process a question using cached analysis results.
+        Process a question using the async router.
 
-        Queries the database for pre-computed analysis instead of running agents.
+        Streams events directly to the WebSocket client.
         """
-        import litellm
+        from src.orchestrator.providers import CachedAnalysisProvider
+        from src.orchestrator.llm_routing_litellm import LLMRouterLiteLLM
         from asgiref.sync import sync_to_async
 
-        # Refresh track from database
-        self.track = await sync_to_async(get_track)(self.track_id)
+        # Refresh track
+        self.track = await sync_to_async(Track.get_or_none)(self.track_id)
         if not self.track:
             await self.send_error("Track not found")
             return
 
-        # Check if track is ready
-        if self.track.status != Track.Status.READY:
-            await self.send_error(f"Track not ready for questions. Status: {self.track.status}")
+        if not self.track.is_ready:
+            await self.send_error(f"Track not ready. Status: {self.track.status}")
             return
 
-        # Tool definitions
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "analyse_spectral",
-                    "description": "Analyse frequency content of audio. Use for questions about frequency, pitch, tone, timbre.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"track_id": {"type": "string"}},
-                        "required": ["track_id"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "analyse_temporal",
-                    "description": "Analyse time-domain properties. Use for questions about duration, volume, dynamics.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"track_id": {"type": "string"}},
-                        "required": ["track_id"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "analyse_rhythm",
-                    "description": "Analyse tempo and rhythm. Use for questions about tempo, BPM, beats.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"track_id": {"type": "string"}},
-                        "required": ["track_id"]
-                    }
-                }
-            },
-        ]
-
-        # Build prompt
-        prompt = f"""You have access to audio analysis tools. The user is asking about an audio file.
-
-Audio file: {self.track.original_filename}
-Duration: {self.track.duration:.1f}s
-
-User question: {question}
-
-Use the appropriate analysis tool(s) to answer this question."""
-
-        messages = [{"role": "user", "content": prompt}]
+        # Create router with cached provider
+        provider = CachedAnalysisProvider()
         model = getattr(settings, "LLM_MODEL", "gemini/gemini-2.0-flash")
+        router = LLMRouterLiteLLM(provider=provider, model=model, enable_tracing=True)
 
+        # Stream events to client
         try:
-            logger.info(f"Calling LLM: {model}")
-            # First call - might return tool calls
-            response = litellm.completion(
-                model=model,
-                messages=messages,
-                tools=tools,
-            )
-            logger.info("LLM response received")
-
-            assistant_message = response.choices[0].message
-            logger.info(f"Tool calls: {assistant_message.tool_calls}, Content: {bool(assistant_message.content)}")
-
-            # Handle tool calls
-            if assistant_message.tool_calls:
-                logger.info(f"Processing {len(assistant_message.tool_calls)} tool calls")
-                messages.append(assistant_message.model_dump())
-
-                for tool_call in assistant_message.tool_calls:
-                    tool_name = tool_call.function.name
-                    agent_name = tool_name.replace("analyse_", "")
-
-                    await self.send_json({
-                        "type": "tool_call",
-                        "tool": agent_name,
-                    })
-
-                    # Get result from cached analysis (instant!)
-                    tool_result = self.execute_tool(agent_name)
-
-                    await self.send_json({
-                        "type": "tool_result",
-                        "tool": agent_name,
-                        "success": tool_result.get("success", False),
-                    })
-
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(tool_result),
-                    })
-
-                # Stream final response
-                await self.stream_response(model, messages)
-
-            elif assistant_message.content:
-                # Direct response without tools
-                logger.info("Sending direct response (no tools)")
-                await self.send_json({
-                    "type": "token",
-                    "text": assistant_message.content,
-                })
-                await self.send_json({
-                    "type": "done",
-                    "full_response": assistant_message.content,
-                })
-            else:
-                logger.warning("No tool calls and no content in response")
-
+            async for event in router.process_question_stream(question, str(self.track.id)):
+                await self.send_json(event)
         except Exception as e:
             logger.exception(f"Error processing question: {e}")
-            await self.send_error(str(e))
-
-    def execute_tool(self, agent_name: str) -> dict:
-        """Execute a tool by querying cached analysis results."""
-        if not self.track:
-            return {"success": False, "error": "Track not found"}
-
-        if self.track.status != Track.Status.READY:
-            return {"success": False, "error": f"Track not ready: {self.track.status}"}
-
-        if agent_name not in self.track.analysis:
-            return {"success": False, "error": f"No {agent_name} analysis available"}
-
-        data = self.track.analysis[agent_name]
-
-        # Check if the analysis itself had an error
-        if isinstance(data, dict) and "error" in data:
-            return {"success": False, "error": data["error"]}
-
-        return {"success": True, "data": data}
-
-    async def stream_response(self, model: str, messages: list):
-        """Stream the final LLM response token by token."""
-        import litellm
-
-        full_response = ""
-
-        try:
-            response = litellm.completion(
-                model=model,
-                messages=messages,
-                stream=True,
-            )
-
-            for chunk in response:
-                if chunk.choices[0].delta.content:
-                    token = chunk.choices[0].delta.content
-                    full_response += token
-                    await self.send_json({
-                        "type": "token",
-                        "text": token,
-                    })
-
-            await self.send_json({
-                "type": "done",
-                "full_response": full_response,
-            })
-
-        except Exception as e:
             await self.send_error(str(e))
 
     async def send_json(self, data: dict):
