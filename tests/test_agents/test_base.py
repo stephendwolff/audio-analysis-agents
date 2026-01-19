@@ -3,6 +3,19 @@ import pytest
 from src.agents.base import BaseAgent, AnalysisResult
 
 
+def test_base_agent_requires_name():
+    """BaseAgent subclasses must define name."""
+
+    class NoNameAgent(BaseAgent):
+        description = "Has description but no name"
+
+        def analyse(self, samples, sample_rate):
+            return AnalysisResult(agent="unknown", success=True, data={})
+
+    with pytest.raises(TypeError, match="name"):
+        NoNameAgent()
+
+
 def test_base_agent_requires_description():
     """BaseAgent subclasses must define description."""
 
