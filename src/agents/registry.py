@@ -23,3 +23,32 @@ def get_agent(name: str) -> "BaseAgent | None":
     """Get a specific agent by name."""
     cls = AGENT_REGISTRY.get(name)
     return cls() if cls else None
+
+
+def get_tool_schemas_openai() -> list[dict]:
+    """
+    Generate OpenAI-format tool schemas from registered agents.
+
+    Returns a list of tool definitions compatible with OpenAI/LiteLLM.
+    """
+    schemas = []
+    for cls in AGENT_REGISTRY.values():
+        agent = cls()
+        schemas.append({
+            "type": "function",
+            "function": {
+                "name": f"analyse_{agent.name}",
+                "description": agent.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "track_id": {
+                            "type": "string",
+                            "description": "Track ID to analyse"
+                        }
+                    },
+                    "required": ["track_id"]
+                }
+            }
+        })
+    return schemas
