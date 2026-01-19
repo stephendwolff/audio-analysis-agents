@@ -1,12 +1,5 @@
 # tests/test_agents/test_registry.py
-import pytest
-from src.agents.registry import (
-    AGENT_REGISTRY,
-    register_agent,
-    get_all_agents,
-    get_agent,
-    get_tool_schemas_openai,
-)
+from src.agents.registry import get_tool_schemas_openai
 
 
 class TestToolSchemaGeneration:
