@@ -138,6 +138,8 @@ The build is configured in `nixpacks.toml` (shared by web and worker). Start com
 | `AWS_STORAGE_BUCKET_NAME` | No | Enables S3 storage |
 | `AWS_ACCESS_KEY_ID` | Conditional | Required with S3 |
 | `AWS_SECRET_ACCESS_KEY` | Conditional | Required with S3 |
+| `SENTRY_DSN` | No | Enables Sentry error tracking |
+| `SENTRY_ENVIRONMENT` | No | Default: `production` |
 
 ## Planned
 
@@ -149,4 +151,5 @@ Features designed but not yet built:
 - **VAMPNET integration** -- audio manipulation and generation
 - **Comparison tools** -- analyse differences between tracks
 - **Visualisation endpoints** -- return spectrograms and waveforms as images
+- **Analysis summaries** -- LLM-generated natural language descriptions of sketchbook analysis results (e.g. "A laid-back, swung groove at 92 BPM with a steady pulse"); would bring Opik tracing to the sketchbook API path
 - **Streaming analysis** -- progressive results for long files

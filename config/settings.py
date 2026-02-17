@@ -8,9 +8,20 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+import sentry_sdk
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Sentry error tracking
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+    )
 
 # Suppress WhiteNoise async warning (harmless, static files served sync in ASGI)
 warnings.filterwarnings(

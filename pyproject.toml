@@ -54,6 +54,7 @@ api = [
     "channels-redis>=4.2.0",
     "django-celery-results>=2.5.0",
     "pydub>=0.25.0",
+    "sentry-sdk[django,celery]>=2.0.0",
 ]
 
 [build-system]
