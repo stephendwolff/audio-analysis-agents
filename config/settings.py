@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "channels",
     "django_celery_results",
     "src.api",
+    "src.sketchbook",
 ]
 
 MIDDLEWARE = [
@@ -213,3 +214,6 @@ USE_TZ = True
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Musical Sketchbook
+SKETCHBOOK_MODEL_VERSION = "1.0.0"
