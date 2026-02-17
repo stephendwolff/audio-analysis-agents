@@ -18,6 +18,7 @@ def pytest_configure():
                 "django.contrib.auth",
                 "django.contrib.contenttypes",
                 "src.api",
+                "src.sketchbook",
             ],
             DEFAULT_AUTO_FIELD="django.db.models.BigAutoField",
             USE_TZ=True,
