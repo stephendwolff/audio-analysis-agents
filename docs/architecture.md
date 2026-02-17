@@ -112,11 +112,16 @@ audio-analysis-agents/
 
 ## Deployment
 
-The API runs on Railway with:
-- PostgreSQL database (auto-provisioned)
-- Redis for Celery broker and channel layers
-- S3 for audio storage (or Railway volume for dev)
-- Gunicorn + Uvicorn for ASGI
+Four Railway services, all from the same repo:
+
+| Service | Role | Start command |
+|---------|------|---------------|
+| **web** | Django ASGI server | `python manage.py migrate --noinput && gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT` |
+| **audio-analysis-agents** | Celery worker | `celery -A src.tasks.celery worker --loglevel=info` |
+| **Postgres** | Database | Managed by Railway |
+| **Redis** | Celery broker + channel layers | Managed by Railway |
+
+The build is configured in `nixpacks.toml` (shared by web and worker). Start commands are set per-service in the Railway dashboard. Audio storage uses S3 in production or a Railway volume for dev.
 
 ### Environment Variables
 

@@ -40,10 +40,13 @@ staticfiles/
 evals/fixtures/*
 !evals/fixtures/.gitkeep
 
+# Package manager artifacts
+Pipfile
+Pipfile.lock
+
 # OS
 .DS_Store
 Thumbs.db
-
 
 .env
 

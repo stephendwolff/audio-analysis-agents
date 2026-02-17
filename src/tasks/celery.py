@@ -15,3 +15,4 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Import tasks explicitly so they get registered
 import src.tasks.analysis  # noqa: F401, E402
+import src.sketchbook.tasks  # noqa: F401, E402

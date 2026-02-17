@@ -25,21 +25,24 @@ A modular system for analysing audio using specialised agents. Use the agents di
 
 ## Installation
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
+```bash
 # Core (agents only)
-pip install -e .
+uv sync
 
 # With API server
-pip install -e ".[api]"
+uv sync --extra api --extra dev
 
 # With LLM routing
-pip install -e ".[litellm]"
+uv sync --extra litellm
+```
 
-# Development
-pip install -e ".[dev]"
+The API also requires ffmpeg (for audio format conversion) and Redis (for Celery):
+
+```bash
+# macOS
+brew install ffmpeg redis
 ```
 
 ## Quick Start: Library
