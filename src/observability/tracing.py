@@ -24,16 +24,20 @@ from contextlib import contextmanager
 from functools import wraps
 from typing import Any
 
-import opik
+try:
+    import opik
+except ImportError:
+    opik = None
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Global client reference
-_client: opik.Opik | None = None
+_client = None
 
 
-def init_tracing(project_name: str = None) -> opik.Opik:
+def init_tracing(project_name: str = None):
     """
     Initialise Opik tracing.
 
@@ -44,9 +48,13 @@ def init_tracing(project_name: str = None) -> opik.Opik:
                       Defaults to OPIK_PROJECT_NAME env var or "audio-analysis-agents".
 
     Returns:
-        Opik client instance
+        Opik client instance, or None if tracing is unavailable
     """
     global _client
+
+    if opik is None:
+        print("Warning: opik package not installed, tracing disabled")
+        return None
 
     api_key = os.getenv("OPIK_API_KEY")
     if not api_key:
@@ -54,12 +62,16 @@ def init_tracing(project_name: str = None) -> opik.Opik:
         return None
 
     project = project_name or os.getenv("OPIK_PROJECT_NAME", "audio-analysis-agents")
-    _client = opik.Opik(project_name=project)
-    print(f"Opik tracing initialised for project: {project}")
-    return _client
+    try:
+        _client = opik.Opik(project_name=project)
+        print(f"Opik tracing initialised for project: {project}")
+        return _client
+    except Exception as e:
+        print(f"Warning: Opik initialisation failed: {e}")
+        return None
 
 
-def get_client() -> opik.Opik | None:
+def get_client():
     """Get the global Opik client."""
     return _client
 
